@@ -252,9 +252,35 @@ defmodule Stackd.Accounts.User do
     end
 
     attribute :confirmed_at, :utc_datetime_usec
+
+    attribute :username, :string do
+      allow_nil? true
+      public? true
+    end
+
+    attribute :display_name, :string do
+      allow_nil? true
+      public? true
+    end
+
+    attribute :bio, :string do
+      allow_nil? true
+      public? true
+    end
+
+    attribute :avatar_url, :string do
+      allow_nil? true
+      public? true
+    end
+
+    attribute :profile_completed_at, :utc_datetime_usec
+
+    attribute :username_last_changed_at, :utc_datetime_usec
+
   end
 
   identities do
     identity :unique_email, [:email]
+    identity :unique_username, [:username], where: expr(not is_nil(username))
   end
 end
