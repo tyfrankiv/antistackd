@@ -49,6 +49,7 @@ defmodule Stackd.Accounts.User do
   postgres do
     table "users"
     repo Stackd.Repo
+
   end
 
   actions do
@@ -226,6 +227,61 @@ defmodule Stackd.Accounts.User do
       # Generates an authentication token for the user
       change AshAuthentication.GenerateTokenChange
     end
+
+    update :complete_profile do
+      description "Complete user profile with username and display name"
+      require_atomic? false
+
+      argument :username, :string do
+        allow_nil? false
+        constraints [min_length: 2, max_length: 32]
+      end
+
+      argument :display_name, :string do
+        allow_nil? false
+        constraints [min_length: 1, max_length: 50]
+      end
+
+      # Only allow if profile not completed
+      validate {Stackd.Accounts.Validations.ProfileNotCompletedValidation, []}
+
+      # Validate username format (alphanumeric + underscores)
+      validate {Stackd.Accounts.Validations.UsernameFormatValidation, []}
+
+      change set_attribute(:username, arg(:username))
+      change set_attribute(:display_name, arg(:display_name))
+      change set_attribute(:profile_completed_at, &DateTime.utc_now/0)
+      change set_attribute(:username_last_changed_at, &DateTime.utc_now/0)
+  end
+
+    update :change_username do
+      description "Change username (rate limited)"
+      require_atomic? false
+
+      argument :username, :string do
+        allow_nil? false
+        constraints [min_length: 2, max_length: 32]
+      end
+
+      # Rate limit username changes to once per 7 days
+      validate {Stackd.Accounts.Validations.UsernameChangeRateLimitValidation, days: 7}
+      validate {Stackd.Accounts.Validations.UsernameFormatValidation, []}
+
+      change set_attribute(:username, arg(:username))
+      change set_attribute(:username_last_changed_at, &DateTime.utc_now/0)
+    end
+
+    update :update_profile do
+      description "Update display name, bio, avatar"
+
+      argument :display_name, :string, allow_nil?: true
+      argument :bio, :string, allow_nil?: true
+      argument :avatar_url, :string, allow_nil?: true
+
+      change set_attribute(:display_name, arg(:display_name))
+      change set_attribute(:bio, arg(:bio))
+      change set_attribute(:avatar_url, arg(:avatar_url))
+    end
   end
 
   policies do
@@ -233,8 +289,16 @@ defmodule Stackd.Accounts.User do
       authorize_if always()
     end
 
-    policy always() do
-      forbid_if always()
+    policy action_type(:read) do
+      authorize_if expr(^actor(:id) == id)
+    end
+
+    policy action(:complete_profile) do
+      authorize_if actor_present()
+    end
+
+    policy action_type(:update) do
+      authorize_if expr(id == ^actor(:id))
     end
   end
 
@@ -281,6 +345,6 @@ defmodule Stackd.Accounts.User do
 
   identities do
     identity :unique_email, [:email]
-    identity :unique_username, [:username], where: expr(not is_nil(username))
+    identity :unique_username, [:username]
   end
 end
