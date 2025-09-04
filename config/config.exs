@@ -60,7 +60,7 @@ config :spark,
 config :stackd,
   ecto_repos: [Stackd.Repo],
   generators: [timestamp_type: :utc_datetime],
-  ash_domains: [Stackd.Accounts]
+  ash_domains: [Stackd.Accounts, Stackd.Media]
 
 # Configures the endpoint
 config :stackd, StackdWeb.Endpoint,
