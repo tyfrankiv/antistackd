@@ -46,17 +46,18 @@ defmodule Stackd.Media.TvShowLog do
     end
 
     # Future: Connect to reviews
-    #has_one :review, Stackd.Media.TvShowReview do
-     # source_attribute :id
-     # destination_attribute :tv_show_log_id
-    #end
+    has_one :review, Stackd.Media.TvShowReview do
+     source_attribute :id
+     destination_attribute :tv_show_log_id
+    end
   end
 
   actions do
     defaults [:read]
 
     create :create do
-      accept [:tv_show_id, :user_id, :rating, :logged_date, :notes, :is_rewatch]
+      accept [:tv_show_id, :rating, :logged_date, :notes, :is_rewatch]
+      change set_attribute(:user_id, actor(:id))
       upsert? true
       upsert_identity :unique_user_tv_show_date
     end

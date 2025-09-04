@@ -44,6 +44,16 @@ defmodule StackdWeb.Router do
       # Redirects to own profile
       live "/profile", Profile.UserProfileLive
     end
+
+    ash_authentication_live_session :public_media_routes,
+      on_mount: [{StackdWeb.LiveUserAuth, :live_user_optional}] do
+      # Public media pages - anyone can view, logged-in users can interact
+      live "/movie/:id", Media.MovieLive, :show
+      live "/tv-show/:id", Media.TvShowLive, :show
+      live "/game/:id", Media.GameLive, :show
+      live "/album/:id", Media.AlbumLive, :show
+    end
+
   end
 
   scope "/", StackdWeb do

@@ -46,17 +46,18 @@ defmodule Stackd.Media.AlbumLog do
     end
 
     # Future: Connect to reviews
-    #has_one :review, Stackd.Media.AlbumReview do
-      #source_attribute :id
-      #destination_attribute :album_log_id
-    #end
+    has_one :review, Stackd.Media.AlbumReview do
+      source_attribute :id
+      destination_attribute :album_log_id
+    end
   end
 
   actions do
     defaults [:read]
 
     create :create do
-      accept [:album_id, :user_id, :rating, :logged_date, :notes, :is_relisten]
+      accept [:album_id, :rating, :logged_date, :notes, :is_relisten]
+      change set_attribute(:user_id, actor(:id))
       upsert? true
       upsert_identity :unique_user_album_date
     end

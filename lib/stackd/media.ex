@@ -10,5 +10,13 @@ defmodule Stackd.Media do
     resource Stackd.Media.TvShowLog
     resource Stackd.Media.GameLog
     resource Stackd.Media.AlbumLog
+    resource Stackd.Media.MovieRating
+    resource Stackd.Media.TvShowRating
+    resource Stackd.Media.GameRating
+    resource Stackd.Media.AlbumRating
+    resource Stackd.Media.MovieReview
+    resource Stackd.Media.TvShowReview
+    resource Stackd.Media.GameReview
+    resource Stackd.Media.AlbumReview
   end
 end

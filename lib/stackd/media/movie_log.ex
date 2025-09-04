@@ -46,17 +46,18 @@ defmodule Stackd.Media.MovieLog do
     end
 
     # Future: Connect to reviews
-    #has_one :review, Stackd.Media.MovieReview do
-     # source_attribute :id
-      #destination_attribute :movie_log_id
-    #end
+    has_one :review, Stackd.Media.MovieReview do
+      source_attribute :id
+      destination_attribute :movie_log_id
+    end
   end
 
   actions do
     defaults [:read]
 
     create :create do
-      accept [:movie_id, :user_id, :rating, :logged_date, :notes, :is_rewatch]
+      accept [:movie_id, :rating, :logged_date, :notes, :is_rewatch]
+      change set_attribute(:user_id, actor(:id))
       upsert? true
       upsert_identity :unique_user_movie_date
     end
