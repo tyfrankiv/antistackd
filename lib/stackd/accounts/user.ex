@@ -4,7 +4,7 @@ defmodule Stackd.Accounts.User do
     domain: Stackd.Accounts,
     data_layer: AshPostgres.DataLayer,
     authorizers: [Ash.Policy.Authorizer],
-    extensions: [AshAuthentication]
+    extensions: [AshAuthentication, AshAdmin.Resource]
 
   authentication do
     add_ons do
@@ -49,7 +49,6 @@ defmodule Stackd.Accounts.User do
   postgres do
     table "users"
     repo Stackd.Repo
-
   end
 
   actions do
@@ -60,6 +59,21 @@ defmodule Stackd.Accounts.User do
       argument :subject, :string, allow_nil?: false
       get? true
       prepare AshAuthentication.Preparations.FilterBySubject
+    end
+
+    read :get_public_profile do
+      description "Get a user's public profile by username"
+      argument :username, :string, allow_nil?: false
+      get? true
+
+      filter expr(username == ^arg(:username))
+      filter expr(not is_nil(profile_completed_at))
+      filter expr(is_nil(banned_at))
+    end
+
+    read :get_own_profile do
+      description "Get user's own complete profile for editing"
+      get? true
     end
 
     update :change_password do
@@ -234,12 +248,12 @@ defmodule Stackd.Accounts.User do
 
       argument :username, :string do
         allow_nil? false
-        constraints [min_length: 2, max_length: 32]
+        constraints min_length: 2, max_length: 32
       end
 
       argument :display_name, :string do
         allow_nil? false
-        constraints [min_length: 1, max_length: 50]
+        constraints min_length: 1, max_length: 50
       end
 
       # Only allow if profile not completed
@@ -248,11 +262,14 @@ defmodule Stackd.Accounts.User do
       # Validate username format (alphanumeric + underscores)
       validate {Stackd.Accounts.Validations.UsernameFormatValidation, []}
 
+      # Sanitize display name
+      validate {Stackd.Accounts.Validations.TextSanitizationValidation, field: :display_name}
+
       change set_attribute(:username, arg(:username))
       change set_attribute(:display_name, arg(:display_name))
       change set_attribute(:profile_completed_at, &DateTime.utc_now/0)
       change set_attribute(:username_last_changed_at, &DateTime.utc_now/0)
-  end
+    end
 
     update :change_username do
       description "Change username (rate limited)"
@@ -260,7 +277,7 @@ defmodule Stackd.Accounts.User do
 
       argument :username, :string do
         allow_nil? false
-        constraints [min_length: 2, max_length: 32]
+        constraints min_length: 2, max_length: 32
       end
 
       # Rate limit username changes to once per 7 days
@@ -273,14 +290,65 @@ defmodule Stackd.Accounts.User do
 
     update :update_profile do
       description "Update display name, bio, avatar"
+      require_atomic? false
 
-      argument :display_name, :string, allow_nil?: true
-      argument :bio, :string, allow_nil?: true
+      argument :display_name, :string, allow_nil?: true, constraints: [min_length: 1, max_length: 50, trim?: true]
+      argument :bio, :string, allow_nil?: true, constraints: [max_length: 500, trim?: true]
       argument :avatar_url, :string, allow_nil?: true
+
+      # Validate and sanitize inputs
+      validate {Stackd.Accounts.Validations.TextSanitizationValidation, field: :display_name}
+      validate {Stackd.Accounts.Validations.TextSanitizationValidation, field: :bio}
+      validate {Stackd.Accounts.Validations.UrlValidation, field: :avatar_url}
 
       change set_attribute(:display_name, arg(:display_name))
       change set_attribute(:bio, arg(:bio))
       change set_attribute(:avatar_url, arg(:avatar_url))
+    end
+
+    update :update do
+      description "Admin update action for all user fields"
+      require_atomic? false
+      primary? true
+
+      accept [:email, :username, :display_name, :bio, :avatar_url, :confirmed_at, :role, :permissions, :banned_at, :ban_reason]
+
+      validate {Stackd.Accounts.Validations.UsernameFormatValidation, []}
+
+      change fn changeset, _context ->
+        if Ash.Changeset.changing_attribute?(changeset, :username) do
+          Ash.Changeset.change_attribute(changeset, :username_last_changed_at, DateTime.utc_now())
+        else
+          changeset
+        end
+      end
+    end
+
+
+
+    # Ban/unban actions
+    update :ban_user do
+      description "Admin/Moderator action to ban a user"
+      require_atomic? false
+
+      argument :ban_reason, :string, allow_nil?: true
+
+      change set_attribute(:banned_at, &DateTime.utc_now/0)
+      change set_attribute(:ban_reason, arg(:ban_reason))
+    end
+
+    update :unban_user do
+      description "Admin/Moderator action to unban a user"
+      require_atomic? false
+
+      change set_attribute(:banned_at, nil)
+      change set_attribute(:ban_reason, nil)
+    end
+
+    # Delete user action
+    destroy :delete_user do
+      description "Admin action to delete a user"
+      require_atomic? false
     end
   end
 
@@ -289,16 +357,41 @@ defmodule Stackd.Accounts.User do
       authorize_if always()
     end
 
-    policy action_type(:read) do
-      authorize_if expr(^actor(:id) == id)
-    end
+
 
     policy action(:complete_profile) do
       authorize_if actor_present()
     end
 
     policy action_type(:update) do
+      # Users can update their own profile
       authorize_if expr(id == ^actor(:id))
+      # Admins can update any user
+      authorize_if expr(^actor(:role) == :admin)
+    end
+
+
+
+    # Ban/unban policies
+    policy action(:ban_user) do
+      authorize_if expr(^actor(:role) in [:admin, :moderator])
+    end
+
+    policy action(:unban_user) do
+      authorize_if expr(^actor(:role) in [:admin, :moderator])
+    end
+
+    # Delete user policy
+    policy action(:delete_user) do
+      authorize_if expr(^actor(:role) == :admin)
+    end
+
+    # Update read policy to check for bans
+    policy action_type(:read) do
+      # Allow users to read their own profile even if banned
+      authorize_if expr(^actor(:id) == id)
+      # Allow anyone to read profiles of users with completed profiles who are not banned
+      authorize_if expr(not is_nil(profile_completed_at) and is_nil(banned_at))
     end
   end
 
@@ -307,7 +400,7 @@ defmodule Stackd.Accounts.User do
 
     attribute :email, :ci_string do
       allow_nil? false
-      public? true
+      public? true  # Required by AshAuthentication
     end
 
     attribute :hashed_password, :string do
@@ -325,11 +418,13 @@ defmodule Stackd.Accounts.User do
     attribute :display_name, :string do
       allow_nil? true
       public? true
+      constraints [min_length: 1, max_length: 50, trim?: true]
     end
 
     attribute :bio, :string do
       allow_nil? true
       public? true
+      constraints [max_length: 500, trim?: true]
     end
 
     attribute :avatar_url, :string do
@@ -341,6 +436,30 @@ defmodule Stackd.Accounts.User do
 
     attribute :username_last_changed_at, :utc_datetime_usec
 
+    # Role and permission system (admin-only visibility)
+    attribute :role, :atom do
+      allow_nil? false
+      default :user
+      constraints one_of: [:admin, :moderator, :user]
+      public? false  # Hide from regular users
+    end
+
+    attribute :permissions, {:array, :string} do
+      allow_nil? false
+      default []
+      public? false  # Hide from regular users
+    end
+
+    # Ban system (admin-only visibility)
+    attribute :banned_at, :utc_datetime_usec do
+      allow_nil? true
+      public? false  # Hide from regular users
+    end
+
+    attribute :ban_reason, :string do
+      allow_nil? true
+      public? false  # Hide from regular users
+    end
   end
 
   identities do

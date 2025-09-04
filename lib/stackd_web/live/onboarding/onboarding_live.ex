@@ -1,21 +1,17 @@
-defmodule StackdWeb.ProfileSetupLive do
+defmodule StackdWeb.Onboarding.OnboardingLive do
   use StackdWeb, :live_view
 
-  on_mount {StackdWeb.LiveUserAuth, :live_user_required}
+  on_mount {StackdWeb.LiveUserAuth, :live_user_profile_setup}
 
   def mount(_params, _session, socket) do
     user = socket.assigns.current_user
 
-    if user && user.profile_completed_at do
-      {:ok, push_navigate(socket, to: ~p"/")}
-    else
-      form =
-        user
-        |> AshPhoenix.Form.for_update(:complete_profile, actor: user)
-        |> to_form()
+    form =
+      user
+      |> AshPhoenix.Form.for_update(:complete_profile, actor: user)
+      |> to_form()
 
-      {:ok, assign(socket, form: form)}
-    end
+    {:ok, assign(socket, form: form)}
   end
 
   def handle_event("validate", %{"form" => params}, socket) do
@@ -30,7 +26,7 @@ defmodule StackdWeb.ProfileSetupLive do
          socket
          |> assign(:current_user, user)
          |> put_flash(:info, "Profile completed!")
-         |> push_navigate(to: ~p"/")}
+         |> push_navigate(to: ~p"/dashboard")}
 
       {:error, form} ->
         {:noreply, assign(socket, :form, form)}

@@ -6,15 +6,20 @@ defmodule Stackd.Accounts.Validations.UsernameChangeRateLimitValidation do
     days = Keyword.get(opts, :days, 7)
 
     case changeset.data do
-      %{username_last_changed_at: nil} -> :ok
+      %{username_last_changed_at: nil} ->
+        :ok
+
       %{username_last_changed_at: last_changed} ->
         cutoff = DateTime.add(DateTime.utc_now(), -days * 24 * 60 * 60, :second)
+
         if DateTime.compare(last_changed, cutoff) == :lt do
           :ok
         else
           {:error, "Username can only be changed once every #{days} days"}
         end
-      _ -> :ok
+
+      _ ->
+        :ok
     end
   end
 

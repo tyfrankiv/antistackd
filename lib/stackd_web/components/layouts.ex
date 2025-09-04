@@ -26,6 +26,7 @@ defmodule StackdWeb.Layouts do
 
   """
   attr :flash, :map, required: true, doc: "the map of flash messages"
+  attr :current_user, :map, default: nil, doc: "the current user"
 
   attr :current_scope, :map,
     default: nil,
@@ -35,37 +36,79 @@ defmodule StackdWeb.Layouts do
 
   def app(assigns) do
     ~H"""
-    <header class="navbar px-4 sm:px-6 lg:px-8">
+    <header class="navbar bg-base-100 border-b border-base-300 px-4 sm:px-6 lg:px-8">
       <div class="flex-1">
-        <a href="/" class="flex-1 flex w-fit items-center gap-2">
-          <img src={~p"/images/logo.svg"} width="36" />
-          <span class="text-sm font-semibold">v{Application.spec(:phoenix, :vsn)}</span>
-        </a>
+        <.link navigate="/" class="flex items-center gap-2 text-xl font-bold">
+          <span class="text-primary">STACKD</span>
+        </.link>
       </div>
       <div class="flex-none">
-        <ul class="flex flex-column px-1 space-x-4 items-center">
-          <li>
-            <a href="https://phoenixframework.org/" class="btn btn-ghost">Website</a>
-          </li>
-          <li>
-            <a href="https://github.com/phoenixframework/phoenix" class="btn btn-ghost">GitHub</a>
-          </li>
+        <ul class="flex items-center space-x-4">
+          <%= if assigns[:current_user] do %>
+            <li>
+              <.link navigate={~p"/@#{@current_user.username}"} class="btn btn-ghost">
+                Profile
+              </.link>
+            </li>
+            <li>
+              <div class="dropdown dropdown-end">
+                <div tabindex="0" role="button" class="btn btn-ghost btn-circle avatar">
+                  <div class="w-8 rounded-full">
+                    <img
+                      src={@current_user.avatar_url || "/images/default-avatar.png"}
+                      alt={@current_user.display_name || @current_user.username}
+                    />
+                  </div>
+                </div>
+                <ul
+                  tabindex="0"
+                  class="dropdown-content menu bg-base-100 rounded-box z-[1] w-52 p-2 shadow"
+                >
+                  <li>
+                    <%= if @current_user.username do %>
+                      <.link
+                        navigate={~p"/@#{@current_user.username}"}
+                        class="flex items-center gap-2"
+                      >
+                        <.icon name="hero-user" class="w-4 h-4" /> Your Profile
+                      </.link>
+                    <% else %>
+                      <.link navigate="/profile" class="flex items-center gap-2">
+                        <.icon name="hero-user" class="w-4 h-4" /> Your Profile
+                      </.link>
+                    <% end %>
+                  </li>
+
+                  <div class="divider my-1"></div>
+                  <li>
+                    <.link href="/sign-out" method="delete" class="flex items-center gap-2 text-error">
+                      <.icon name="hero-arrow-right-on-rectangle" class="w-4 h-4" /> Sign Out
+                    </.link>
+                  </li>
+                </ul>
+              </div>
+            </li>
+          <% else %>
+            <li>
+              <.link navigate="/sign-in" class="btn btn-ghost">
+                Sign In
+              </.link>
+            </li>
+            <li>
+              <.link navigate="/register" class="btn btn-primary">
+                Sign Up
+              </.link>
+            </li>
+          <% end %>
           <li>
             <.theme_toggle />
-          </li>
-          <li>
-            <a href="https://hexdocs.pm/phoenix/overview.html" class="btn btn-primary">
-              Get Started <span aria-hidden="true">&rarr;</span>
-            </a>
           </li>
         </ul>
       </div>
     </header>
 
-    <main class="px-4 py-20 sm:px-6 lg:px-8">
-      <div class="mx-auto max-w-2xl space-y-4">
-        {render_slot(@inner_block)}
-      </div>
+    <main class="min-h-screen">
+      {render_slot(@inner_block)}
     </main>
 
     <.flash_group flash={@flash} />

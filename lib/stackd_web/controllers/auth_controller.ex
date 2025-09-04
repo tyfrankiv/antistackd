@@ -3,18 +3,23 @@ defmodule StackdWeb.AuthController do
   use AshAuthentication.Phoenix.Controller
 
   def success(conn, activity, user, _token) do
-    return_to = case {activity, user.profile_completed_at} do
-      # Redirect new registrations to profile setup
-      {{:password, :register}, nil} -> ~p"/complete-profile"
-      _ -> get_session(conn, :return_to) || ~p"/"
-    end
+    return_to =
+      if is_nil(user.profile_completed_at) do
+        # User hasn't completed profile setup
+        ~p"/complete-profile"
+      else
+        # Profile is completed, go to dashboard
+        get_session(conn, :return_to) || ~p"/dashboard"
+      end
 
-    message = case activity do
-      {:confirm_new_user, :confirm} -> "Your email address has now been confirmed"
-      {:password, :reset} -> "Your password has successfully been reset"
-      {{:password, :register}, _} -> "Welcome! Please complete your profile"
-      _ -> "You are now signed in"
-    end
+    message =
+      case {activity, user.profile_completed_at} do
+        {{:password, :register}, nil} -> "Welcome! Please complete your profile setup to continue"
+        {:confirm_new_user, :confirm} -> "Your email address has now been confirmed"
+        {:password, :reset} -> "Your password has successfully been reset"
+        {_, nil} -> "Please complete your profile setup to continue"
+        _ -> "You are now signed in"
+      end
 
     conn
     |> delete_session(:return_to)
