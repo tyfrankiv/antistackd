@@ -59,7 +59,6 @@ defmodule StackdWeb do
   def live_component do
     quote do
       use Phoenix.LiveComponent
-
       unquote(html_helpers())
     end
   end

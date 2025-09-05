@@ -15,6 +15,40 @@ defmodule Stackd.Media.GameRating do
     end
   end
 
+  actions do
+    defaults [:read]
+
+    create :create do
+      accept [:game_id, :rating]
+      change set_attribute(:user_id, actor(:id))
+      upsert? true
+      upsert_identity :unique_user_game
+    end
+
+    update :update do
+      accept [:rating]
+    end
+
+    destroy :destroy
+  end
+
+  policies do
+    # Anyone can read ratings (public like Letterboxd)
+    policy action_type(:read) do
+      authorize_if always()
+    end
+
+    # Only logged-in users can create ratings
+    policy action_type(:create) do
+      authorize_if actor_present()
+    end
+
+    # Only the owner can update/delete their ratings
+    policy action_type([:update, :destroy]) do
+      authorize_if actor_attribute_equals(:id, :user_id)
+    end
+  end
+
   attributes do
     uuid_primary_key :id
 
@@ -37,41 +71,7 @@ defmodule Stackd.Media.GameRating do
     end
   end
 
-  actions do
-    defaults [:read]
-
-    create :create do
-      accept [:game_id, :rating]
-      change set_attribute(:user_id, actor(:id))
-      upsert? true
-      upsert_identity :unique_user_game
-    end
-
-    update :update do
-      accept [:rating]
-    end
-
-    destroy :destroy
-  end
-
   identities do
     identity :unique_user_game, [:user_id, :game_id]
-  end
-
-  policies do
-    # Anyone can read ratings (public like Letterboxd)
-    policy action_type(:read) do
-      authorize_if always()
-    end
-
-    # Only logged-in users can create ratings
-    policy action_type(:create) do
-      authorize_if actor_present()
-    end
-
-    # Only the owner can update/delete their ratings
-    policy action_type([:update, :destroy]) do
-      authorize_if actor_attribute_equals(:id, :user_id)
-    end
   end
 end

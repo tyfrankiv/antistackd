@@ -292,7 +292,10 @@ defmodule Stackd.Accounts.User do
       description "Update display name, bio, avatar"
       require_atomic? false
 
-      argument :display_name, :string, allow_nil?: true, constraints: [min_length: 1, max_length: 50, trim?: true]
+      argument :display_name, :string,
+        allow_nil?: true,
+        constraints: [min_length: 1, max_length: 50, trim?: true]
+
       argument :bio, :string, allow_nil?: true, constraints: [max_length: 500, trim?: true]
       argument :avatar_url, :string, allow_nil?: true
 
@@ -311,7 +314,18 @@ defmodule Stackd.Accounts.User do
       require_atomic? false
       primary? true
 
-      accept [:email, :username, :display_name, :bio, :avatar_url, :confirmed_at, :role, :permissions, :banned_at, :ban_reason]
+      accept [
+        :email,
+        :username,
+        :display_name,
+        :bio,
+        :avatar_url,
+        :confirmed_at,
+        :role,
+        :permissions,
+        :banned_at,
+        :ban_reason
+      ]
 
       validate {Stackd.Accounts.Validations.UsernameFormatValidation, []}
 
@@ -323,8 +337,6 @@ defmodule Stackd.Accounts.User do
         end
       end
     end
-
-
 
     # Ban/unban actions
     update :ban_user do
@@ -357,8 +369,6 @@ defmodule Stackd.Accounts.User do
       authorize_if always()
     end
 
-
-
     policy action(:complete_profile) do
       authorize_if actor_present()
     end
@@ -369,8 +379,6 @@ defmodule Stackd.Accounts.User do
       # Admins can update any user
       authorize_if expr(^actor(:role) == :admin)
     end
-
-
 
     # Ban/unban policies
     policy action(:ban_user) do
@@ -400,7 +408,8 @@ defmodule Stackd.Accounts.User do
 
     attribute :email, :ci_string do
       allow_nil? false
-      public? true  # Required by AshAuthentication
+      # Required by AshAuthentication
+      public? true
     end
 
     attribute :hashed_password, :string do
@@ -418,13 +427,13 @@ defmodule Stackd.Accounts.User do
     attribute :display_name, :string do
       allow_nil? true
       public? true
-      constraints [min_length: 1, max_length: 50, trim?: true]
+      constraints min_length: 1, max_length: 50, trim?: true
     end
 
     attribute :bio, :string do
       allow_nil? true
       public? true
-      constraints [max_length: 500, trim?: true]
+      constraints max_length: 500, trim?: true
     end
 
     attribute :avatar_url, :string do
@@ -441,24 +450,28 @@ defmodule Stackd.Accounts.User do
       allow_nil? false
       default :user
       constraints one_of: [:admin, :moderator, :user]
-      public? false  # Hide from regular users
+      # Hide from regular users
+      public? false
     end
 
     attribute :permissions, {:array, :string} do
       allow_nil? false
       default []
-      public? false  # Hide from regular users
+      # Hide from regular users
+      public? false
     end
 
     # Ban system (admin-only visibility)
     attribute :banned_at, :utc_datetime_usec do
       allow_nil? true
-      public? false  # Hide from regular users
+      # Hide from regular users
+      public? false
     end
 
     attribute :ban_reason, :string do
       allow_nil? true
-      public? false  # Hide from regular users
+      # Hide from regular users
+      public? false
     end
   end
 

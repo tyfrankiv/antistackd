@@ -27,6 +27,42 @@ defmodule Stackd.Media.TvShowReview do
     end
   end
 
+  actions do
+    defaults [:read]
+
+    create :create do
+      accept [:tv_show_id, :tv_show_log_id, :content, :rating, :spoiler]
+      change set_attribute(:user_id, actor(:id))
+      change after_action(&update_user_rating/3)
+    end
+
+    update :update do
+      accept [:content, :rating, :spoiler]
+      change after_action(&update_user_rating/3)
+      require_atomic? false
+    end
+
+    destroy :destroy
+  end
+
+  policies do
+    policy action_type(:read) do
+      authorize_if always()
+    end
+
+    policy action_type(:create) do
+      authorize_if actor_present()
+    end
+
+    policy action_type([:update, :destroy]) do
+      authorize_if actor_attribute_equals(:id, :user_id)
+    end
+  end
+
+  validations do
+    validate {Stackd.Accounts.Validations.TextSanitizationValidation, field: :content}
+  end
+
   attributes do
     uuid_primary_key :id
 
@@ -63,42 +99,6 @@ defmodule Stackd.Media.TvShowReview do
     end
   end
 
-  validations do
-    validate {Stackd.Accounts.Validations.TextSanitizationValidation, field: :content}
-  end
-
-  actions do
-    defaults [:read]
-
-    create :create do
-      accept [:tv_show_id, :tv_show_log_id, :content, :rating, :spoiler]
-      change set_attribute(:user_id, actor(:id))
-      change after_action(&update_user_rating/3)
-    end
-
-    update :update do
-      accept [:content, :rating, :spoiler]
-      change after_action(&update_user_rating/3)
-      require_atomic? false
-    end
-
-    destroy :destroy
-  end
-
-  policies do
-    policy action_type(:read) do
-      authorize_if always()
-    end
-
-    policy action_type(:create) do
-      authorize_if actor_present()
-    end
-
-    policy action_type([:update, :destroy]) do
-      authorize_if actor_attribute_equals(:id, :user_id)
-    end
-  end
-
   defp update_user_rating(_changeset, review, _context) do
     if review.rating do
       case Stackd.Media.TvShowRating
@@ -107,7 +107,7 @@ defmodule Stackd.Media.TvShowReview do
              tv_show_id: review.tv_show_id,
              rating: review.rating
            })
-           |> Ash.create() do
+           |> Ash.create(actor: review.user) do
         {:ok, _rating} -> {:ok, review}
         {:error, error} -> {:error, error}
       end

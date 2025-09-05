@@ -48,12 +48,11 @@ defmodule StackdWeb.Router do
     ash_authentication_live_session :public_media_routes,
       on_mount: [{StackdWeb.LiveUserAuth, :live_user_optional}] do
       # Public media pages - anyone can view, logged-in users can interact
-      live "/movie/:id", Media.MovieLive, :show
-      live "/tv-show/:id", Media.TvShowLive, :show
-      live "/game/:id", Media.GameLive, :show
-      live "/album/:id", Media.AlbumLive, :show
+      live "/movie/:id", Media.MediaLive, :show
+      live "/tv-show/:id", Media.MediaLive, :show
+      live "/game/:id", Media.MediaLive, :show
+      live "/album/:id", Media.MediaLive, :show
     end
-
   end
 
   scope "/", StackdWeb do

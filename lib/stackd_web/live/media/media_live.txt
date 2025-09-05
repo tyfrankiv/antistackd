@@ -1,0 +1,411 @@
+# lib/stackd_web/live/media/media_live.ex
+defmodule StackdWeb.Media.MediaLive do
+  use StackdWeb, :live_view
+
+  alias Stackd.Media
+  alias Stackd.Media.{Movie, Album, Game, TvShow}
+  alias Stackd.Media.{MovieRating, AlbumRating, GameRating, TvShowRating}
+  alias Stackd.Media.{MovieLog, AlbumLog, GameLog, TvShowLog}
+  alias Stackd.Media.{MovieReview, AlbumReview, GameReview, TvShowReview}
+
+  @impl true
+  def mount(%{"type" => media_type, "id" => media_id}, _session, socket) do
+    if valid_media_type?(media_type) do
+      {:ok,
+       socket
+       |> assign(:media_type, media_type)
+       |> assign(:media_id, media_id)
+       |> assign(:page_title, "Loading...")
+       |> assign(:loading, true)
+       |> assign(:error, nil)
+       |> assign(:show_interaction_modal, false)
+       |> assign(:show_review_modal, false)
+       |> assign(:review_modal_type, :create)
+       |> assign(:editing_review, nil)
+       |> load_media_data()}
+    else
+      {:ok,
+       socket
+       |> put_flash(:error, "Invalid media type")
+       |> redirect(to: ~p"/")}
+    end
+  end
+
+  @impl true
+  def render(assigns) do
+    ~H"""
+    <div class="min-h-screen bg-gray-900">
+      <%= if @loading do %>
+        <div class="flex items-center justify-center min-h-screen">
+          <div class="loading loading-spinner loading-lg text-primary"></div>
+        </div>
+      <% end %>
+
+      <%= if @error do %>
+        <div class="container mx-auto px-4 py-8">
+          <div class="alert alert-error">
+            <span><%= @error %></span>
+          </div>
+        </div>
+      <% end %>
+
+      <%= if !@loading && !@error do %>
+        <!-- Hero Section with Background -->
+        <.live_component
+          module={StackdWeb.Components.Media.MediaHero}
+          id="media-hero"
+          media={@media}
+          media_type={@media_type}
+        />
+
+        <div class="container mx-auto px-4 py-8 -mt-32 relative z-10">
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Left Column: Poster -->
+            <div class="lg:col-span-1">
+              <div class="sticky top-8">
+                <.live_component
+                  module={StackdWeb.Components.Media.MediaPoster}
+                  id="media-poster"
+                  media={@media}
+                  media_type={@media_type}
+                />
+              </div>
+            </div>
+
+            <!-- Right Column: Info & Actions -->
+            <div class="lg:col-span-2 space-y-6">
+              <!-- Media Info -->
+              <.live_component
+                module={StackdWeb.Components.Media.MediaInfo}
+                id="media-info"
+                media={@media}
+                media_type={@media_type}
+              />
+
+              <!-- Rating Section -->
+              <.live_component
+                module={StackdWeb.Components.Media.MediaRating}
+                id="media-rating"
+                avg_rating={@avg_rating}
+                rating_count={@rating_count}
+                user_rating={@user_rating && @user_rating.rating}
+              />
+
+              <!-- User Stats -->
+              <%= if @current_user do %>
+                <.live_component
+                  module={StackdWeb.Components.Media.MediaStats}
+                  id="media-stats"
+                  user_logs={@user_logs}
+                  user_rating={@user_rating}
+                  user_review={@user_review}
+                  media_type={@media_type}
+                />
+              <% end %>
+
+              <!-- Action Buttons -->
+              <%= if @current_user do %>
+                <.live_component
+                  module={StackdWeb.Components.Media.UserActions}
+                  id="user-actions"
+                  user_rating={@user_rating}
+                  latest_log={@latest_log}
+                  user_review={@user_review}
+                  media_type={@media_type}
+                />
+              <% end %>
+
+              <!-- Reviews Section -->
+              <.live_component
+                module={StackdWeb.Components.Media.ReviewsSection}
+                id="reviews-section"
+                reviews={@recent_reviews}
+                current_user={@current_user}
+                media_type={@media_type}
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Modals -->
+        <%= if @show_interaction_modal do %>
+          <.live_component
+            module={StackdWeb.Components.Media.MediaInteractionForm}
+            id="interaction-modal"
+            show={@show_interaction_modal}
+            media={@media}
+            media_type={@media_type}
+            user_rating={@user_rating}
+            latest_log={@latest_log}
+            user_review={@user_review}
+          />
+        <% end %>
+
+        <%= if @show_review_modal do %>
+          <.live_component
+            module={StackdWeb.Media.Components.ReviewModal}
+            id="review-modal"
+            show={@show_review_modal}
+            review_modal_type={@review_modal_type}
+            editing_review={@editing_review}
+          />
+        <% end %>
+      <% end %>
+    </div>
+    """
+  end
+
+  @impl true
+  def handle_event("quick_rate", %{"rating" => rating_str}, socket) do
+    case Integer.parse(rating_str) do
+      {rating, ""} when rating >= 1 and rating <= 10 ->
+        create_or_update_rating(socket, rating)
+      _ ->
+        {:noreply, put_flash(socket, :error, "Invalid rating")}
+    end
+  end
+
+  @impl true
+  def handle_event("show_interaction_modal", _params, socket) do
+    {:noreply, assign(socket, :show_interaction_modal, true)}
+  end
+
+  @impl true
+  def handle_event("show_review_modal", _params, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_review_modal, true)
+     |> assign(:review_modal_type, :create)
+     |> assign(:editing_review, nil)}
+  end
+
+  @impl true
+  def handle_info({:hide_interaction_modal}, socket) do
+    {:noreply, assign(socket, :show_interaction_modal, false)}
+  end
+
+  @impl true
+  def handle_info({:hide_review_modal}, socket) do
+    {:noreply, assign(socket, :show_review_modal, false)}
+  end
+
+  @impl true
+  def handle_info({:interaction_created, _result}, socket) do
+    {:noreply,
+     socket
+     |> assign(:show_interaction_modal, false)
+     |> put_flash(:info, "Successfully saved!")
+     |> reload_media_data()}
+  end
+
+  @impl true
+  def handle_info({:create_review, review_params}, socket) do
+    case create_review(review_params, socket) do
+      {:ok, _review} ->
+        {:noreply,
+         socket
+         |> assign(:show_review_modal, false)
+         |> put_flash(:info, "Review posted successfully!")
+         |> reload_media_data()}
+
+      {:error, error} ->
+        {:noreply, put_flash(socket, :error, "Failed to create review: #{inspect(error)}")}
+    end
+  end
+
+  # Private Functions
+
+  defp valid_media_type?(type) when type in ["movie", "album", "game", "tv_show"], do: true
+  defp valid_media_type?(_), do: false
+
+  defp load_media_data(socket) do
+    %{media_type: media_type, media_id: media_id, current_user: user} = socket.assigns
+
+    case fetch_media(media_type, media_id) do
+      {:ok, media} ->
+        socket
+        |> assign(:media, media)
+        |> assign(:page_title, get_media_title(media, media_type))
+        |> load_rating_data()
+        |> load_user_data(user)
+        |> load_reviews()
+        |> assign(:loading, false)
+
+      {:error, _error} ->
+        socket
+        |> assign(:error, "Media not found")
+        |> assign(:loading, false)
+    end
+  end
+
+  defp reload_media_data(socket) do
+    socket
+    |> assign(:loading, true)
+    |> load_media_data()
+  end
+
+  defp fetch_media("movie", id), do: Ash.get(Movie, id)
+  defp fetch_media("album", id), do: Ash.get(Album, id)
+  defp fetch_media("game", id), do: Ash.get(Game, id)
+  defp fetch_media("tv_show", id), do: Ash.get(TvShow, id)
+
+  defp get_media_title(media, "movie"), do: media.title
+  defp get_media_title(media, _), do: media.name
+
+  defp load_rating_data(socket) do
+    %{media_type: media_type, media_id: media_id} = socket.assigns
+    rating_resource = get_rating_resource(media_type)
+    media_field = get_media_field(media_type)
+
+    ratings = rating_resource
+              |> Ash.Query.filter([{media_field, media_id}])
+              |> Ash.Query.filter(not is_nil(:rating))
+              |> Ash.read!()
+
+    avg_rating = if length(ratings) > 0 do
+      ratings
+      |> Enum.map(& &1.rating)
+      |> Enum.sum()
+      |> Kernel./(length(ratings))
+      |> Float.round(1)
+    else
+      nil
+    end
+
+    socket
+    |> assign(:avg_rating, avg_rating)
+    |> assign(:rating_count, length(ratings))
+  end
+
+  defp load_user_data(socket, nil) do
+    socket
+    |> assign(:user_rating, nil)
+    |> assign(:user_logs, [])
+    |> assign(:latest_log, nil)
+    |> assign(:user_review, nil)
+  end
+
+  defp load_user_data(socket, user) do
+    %{media_type: media_type, media_id: media_id} = socket.assigns
+
+    # Load user's rating
+    rating_resource = get_rating_resource(media_type)
+    media_field = get_media_field(media_type)
+
+    user_rating = rating_resource
+                  |> Ash.Query.filter(user_id: user.id)
+                  |> Ash.Query.filter([{media_field, media_id}])
+                  |> Ash.read!()
+                  |> List.first()
+
+    # Load user's logs
+    log_resource = get_log_resource(media_type)
+
+    user_logs = log_resource
+                |> Ash.Query.filter(user_id: user.id)
+                |> Ash.Query.filter([{media_field, media_id}])
+                |> Ash.Query.sort(logged_date: :desc)
+                |> Ash.read!()
+
+    latest_log = List.first(user_logs)
+
+    # Load user's review
+    review_resource = get_review_resource(media_type)
+
+    user_review = review_resource
+                  |> Ash.Query.filter(user_id: user.id)
+                  |> Ash.Query.filter([{media_field, media_id}])
+                  |> Ash.read!()
+                  |> List.first()
+
+    socket
+    |> assign(:user_rating, user_rating)
+    |> assign(:user_logs, user_logs)
+    |> assign(:latest_log, latest_log)
+    |> assign(:user_review, user_review)
+  end
+
+  defp load_reviews(socket) do
+    %{media_type: media_type, media_id: media_id} = socket.assigns
+
+    review_resource = get_review_resource(media_type)
+    media_field = get_media_field(media_type)
+
+    reviews = review_resource
+              |> Ash.Query.filter([{media_field, media_id}])
+              |> Ash.Query.sort(created_at: :desc)
+              |> Ash.Query.limit(10)
+              |> Ash.Query.load([:user])
+              |> Ash.read!()
+
+    assign(socket, :recent_reviews, reviews)
+  end
+
+  defp create_or_update_rating(socket, rating) do
+    %{media_type: media_type, media_id: media_id, current_user: user} = socket.assigns
+
+    if user do
+      rating_resource = get_rating_resource(media_type)
+      media_field = get_media_field(media_type)
+
+      params = %{
+        media_field => media_id,
+        rating: rating
+      }
+
+      case rating_resource
+           |> Ash.Changeset.for_create(:create, params)
+           |> Ash.create(actor: user) do
+        {:ok, _rating} ->
+          {:noreply,
+           socket
+           |> put_flash(:info, "Rating saved!")
+           |> reload_media_data()}
+
+        {:error, _error} ->
+          {:noreply, put_flash(socket, :error, "Failed to save rating")}
+      end
+    else
+      {:noreply, put_flash(socket, :error, "Please log in to rate")}
+    end
+  end
+
+  defp create_review(params, socket) do
+    %{media_type: media_type, media_id: media_id, current_user: user} = socket.assigns
+
+    review_resource = get_review_resource(media_type)
+    media_field = get_media_field(media_type)
+
+    review_params = %{
+      media_field => media_id,
+      content: params["content"],
+      rating: if(params["rating"], do: String.to_integer(params["rating"]), else: nil),
+      spoiler: params["spoiler"] == "on"
+    }
+
+    review_resource
+    |> Ash.Changeset.for_create(:create, review_params)
+    |> Ash.create(actor: user)
+  end
+
+  # Resource mapping helpers
+  defp get_rating_resource("movie"), do: MovieRating
+  defp get_rating_resource("album"), do: AlbumRating
+  defp get_rating_resource("game"), do: GameRating
+  defp get_rating_resource("tv_show"), do: TvShowRating
+
+  defp get_log_resource("movie"), do: MovieLog
+  defp get_log_resource("album"), do: AlbumLog
+  defp get_log_resource("game"), do: GameLog
+  defp get_log_resource("tv_show"), do: TvShowLog
+
+  defp get_review_resource("movie"), do: MovieReview
+  defp get_review_resource("album"), do: AlbumReview
+  defp get_review_resource("game"), do: GameReview
+  defp get_review_resource("tv_show"), do: TvShowReview
+
+  defp get_media_field("movie"), do: :movie_id
+  defp get_media_field("album"), do: :album_id
+  defp get_media_field("game"), do: :game_id
+  defp get_media_field("tv_show"), do: :tv_show_id
+end

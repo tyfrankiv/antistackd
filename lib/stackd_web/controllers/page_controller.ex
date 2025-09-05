@@ -6,7 +6,7 @@ defmodule StackdWeb.PageController do
       nil ->
         # Not signed in, show landing page
         render(conn, :home)
-      
+
       user ->
         if is_nil(user.profile_completed_at) do
           # Signed in but profile not complete

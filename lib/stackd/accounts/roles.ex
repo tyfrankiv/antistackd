@@ -7,7 +7,7 @@ defmodule Stackd.Accounts.Roles do
   @permissions [
     # Future permissions - not implemented yet but defined for extensibility
     "manage_users",
-    "ban_users", 
+    "ban_users",
     "moderate_content",
     "view_admin_panel",
     "delete_content",
@@ -30,6 +30,7 @@ defmodule Stackd.Accounts.Roles do
   def has_role?(%{role: role}, required_role) when role in @roles do
     role == required_role
   end
+
   def has_role?(_, _), do: false
 
   @doc """
@@ -50,6 +51,7 @@ defmodule Stackd.Accounts.Roles do
   def has_permission?(%{permissions: permissions}, permission) when is_list(permissions) do
     permission in permissions
   end
+
   def has_permission?(_, _), do: false
 
   @doc """

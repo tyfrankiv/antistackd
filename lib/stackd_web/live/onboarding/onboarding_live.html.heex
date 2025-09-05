@@ -4,7 +4,9 @@
       <div class="card-body">
         <div class="text-center mb-6">
           <h1 class="card-title text-3xl font-bold text-primary justify-center mb-2">Welcome!</h1>
-          <p class="text-base-content/70">You must set up your username to continue using the site</p>
+          <p class="text-base-content/70">
+            You must set up your username to continue using the site
+          </p>
         </div>
 
         <.form for={@form} phx-change="validate" phx-submit="save" class="space-y-4">
@@ -12,12 +14,12 @@
             <label class="label">
               <span class="label-text font-medium">Username</span>
             </label>
-            <.input 
-              field={@form[:username]} 
+            <.input
+              field={@form[:username]}
               type="text"
               placeholder="your_username"
               class="input input-bordered w-full"
-              required 
+              required
             />
             <label class="label">
               <span class="label-text-alt text-base-content/60">
@@ -30,12 +32,12 @@
             <label class="label">
               <span class="label-text font-medium">Display Name</span>
             </label>
-            <.input 
-              field={@form[:display_name]} 
+            <.input
+              field={@form[:display_name]}
               type="text"
               placeholder="Your Display Name"
               class="input input-bordered w-full"
-              required 
+              required
             />
             <label class="label">
               <span class="label-text-alt text-base-content/60">
@@ -45,8 +47,8 @@
           </div>
 
           <div class="form-control mt-6">
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               phx-disable-with="Creating your profile..."
               class="btn btn-primary w-full"
             >
@@ -56,10 +58,12 @@
         </.form>
 
         <div class="divider"></div>
-        
+
         <div class="alert alert-info">
           <.icon name="hero-information-circle" class="w-5 h-5" />
-          <span class="text-sm">You cannot access the site without completing your profile setup.</span>
+          <span class="text-sm">
+            You cannot access the site without completing your profile setup.
+          </span>
         </div>
       </div>
     </div>

@@ -148,27 +148,26 @@ defmodule StackdWeb.Profile.UserProfileLive do
                   />
                 </div>
               </div>
-
-              <!-- Profile Info -->
+              
+    <!-- Profile Info -->
               <div class="flex-1">
                 <div class="flex flex-col md:flex-row md:items-center gap-4 mb-4">
                   <div>
                     <h1 class="text-3xl font-bold">{@user.display_name}</h1>
                     <p class="text-base-content/70 text-lg">@{@user.username}</p>
                   </div>
-
-                  <!-- Edit Button (only show for own profile) -->
+                  
+    <!-- Edit Button (only show for own profile) -->
                   <button
                     :if={@is_own_profile}
                     phx-click="show_edit_modal"
                     class="btn btn-outline btn-primary"
                   >
-                    <.icon name="hero-pencil" class="w-4 h-4" />
-                    Edit Profile
+                    <.icon name="hero-pencil" class="w-4 h-4" /> Edit Profile
                   </button>
                 </div>
-
-                <!-- Bio -->
+                
+    <!-- Bio -->
                 <div :if={@user.bio} class="prose max-w-none">
                   <p class="text-base-content/80">{@user.bio}</p>
                 </div>
@@ -178,8 +177,8 @@ defmodule StackdWeb.Profile.UserProfileLive do
               </div>
             </div>
           </div>
-
-          <!-- Profile Content -->
+          
+    <!-- Profile Content -->
           <div class="bg-base-200 rounded-lg p-8">
             <h2 class="text-2xl font-bold mb-4">Posts</h2>
             <div class="text-center py-12 text-base-content/50">
@@ -189,8 +188,8 @@ defmodule StackdWeb.Profile.UserProfileLive do
             </div>
           </div>
         </div>
-
-        <!-- Profile Edit Modal Component (only render if own profile) -->
+        
+    <!-- Profile Edit Modal Component (only render if own profile) -->
         <.live_component
           :if={@is_own_profile}
           module={ProfileEditModal}
@@ -207,20 +206,24 @@ defmodule StackdWeb.Profile.UserProfileLive do
 
   # Helper function to create fresh forms
   defp assign_fresh_forms(socket, user) do
-    profile_form = user
+    profile_form =
+      user
       |> Form.for_update(:update_profile,
-          actor: user,
-          params: %{
-            "display_name" => user.display_name || "",
-            "bio" => user.bio || "",
-            "avatar_url" => user.avatar_url || ""
-          })
+        actor: user,
+        params: %{
+          "display_name" => user.display_name || "",
+          "bio" => user.bio || "",
+          "avatar_url" => user.avatar_url || ""
+        }
+      )
       |> to_form()
 
-    username_form = user
+    username_form =
+      user
       |> Form.for_update(:change_username,
-          actor: user,
-          params: %{"username" => user.username || ""})
+        actor: user,
+        params: %{"username" => user.username || ""}
+      )
       |> to_form()
 
     socket
@@ -231,7 +234,9 @@ defmodule StackdWeb.Profile.UserProfileLive do
   # Helper function to check if user can change username
   defp can_change_username?(user) do
     case user.username_last_changed_at do
-      nil -> true
+      nil ->
+        true
+
       last_changed ->
         DateTime.diff(DateTime.utc_now(), last_changed, :day) >= 7
     end

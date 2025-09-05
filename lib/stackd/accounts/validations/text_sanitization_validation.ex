@@ -46,12 +46,18 @@ defmodule Stackd.Accounts.Validations.TextSanitizationValidation do
   defp contains_html_tags?(text) do
     # Check for common HTML tags and entities
     html_patterns = [
-      ~r/<[^>]*>/,           # HTML tags
-      ~r/&[a-zA-Z0-9#]+;/,   # HTML entities
-      ~r/javascript:/i,       # JavaScript protocol
-      ~r/data:/i,            # Data URLs
-      ~r/vbscript:/i,        # VBScript protocol
-      ~r/on\w+\s*=/i         # Event handlers
+      # HTML tags
+      ~r/<[^>]*>/,
+      # HTML entities
+      ~r/&[a-zA-Z0-9#]+;/,
+      # JavaScript protocol
+      ~r/javascript:/i,
+      # Data URLs
+      ~r/data:/i,
+      # VBScript protocol
+      ~r/vbscript:/i,
+      # Event handlers
+      ~r/on\w+\s*=/i
     ]
 
     Enum.any?(html_patterns, &Regex.match?(&1, text))
@@ -79,7 +85,7 @@ defmodule Stackd.Accounts.Validations.TextSanitizationValidation do
     whitespace_count = String.length(text) - String.length(String.trim(text))
     total_length = String.length(text)
 
-    total_length > 0 and (whitespace_count / total_length) > 0.5
+    total_length > 0 and whitespace_count / total_length > 0.5
   end
 
   defp contains_special_chars?(text) do

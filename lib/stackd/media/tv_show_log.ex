@@ -1,4 +1,3 @@
-# lib/stackd/media/tv_show_log.ex
 defmodule Stackd.Media.TvShowLog do
   use Ash.Resource,
     domain: Stackd.Media,
@@ -8,6 +7,43 @@ defmodule Stackd.Media.TvShowLog do
   postgres do
     table "tv_show_logs"
     repo Stackd.Repo
+  end
+
+  actions do
+    defaults [:read]
+
+    create :create do
+      accept [:tv_show_id, :rating, :logged_date, :notes, :is_rewatch]
+      change set_attribute(:user_id, actor(:id))
+      change after_action(&update_user_rating/3)
+      upsert? true
+      upsert_identity :unique_user_tv_show_date
+    end
+
+    update :update do
+      accept [:rating, :logged_date, :notes, :is_rewatch]
+      change after_action(&update_user_rating/3)
+      require_atomic? false
+    end
+
+    destroy :destroy
+  end
+
+  policies do
+    # Anyone can read logs (public like Letterboxd)
+    policy action_type(:read) do
+      authorize_if always()
+    end
+
+    # Only logged-in users can create logs
+    policy action_type(:create) do
+      authorize_if actor_present()
+    end
+
+    # Only the owner can update/delete their logs
+    policy action_type([:update, :destroy]) do
+      authorize_if actor_attribute_equals(:id, :user_id)
+    end
   end
 
   attributes do
@@ -47,46 +83,28 @@ defmodule Stackd.Media.TvShowLog do
 
     # Future: Connect to reviews
     has_one :review, Stackd.Media.TvShowReview do
-     source_attribute :id
-     destination_attribute :tv_show_log_id
+      source_attribute :id
+      destination_attribute :tv_show_log_id
     end
-  end
-
-  actions do
-    defaults [:read]
-
-    create :create do
-      accept [:tv_show_id, :rating, :logged_date, :notes, :is_rewatch]
-      change set_attribute(:user_id, actor(:id))
-      upsert? true
-      upsert_identity :unique_user_tv_show_date
-    end
-
-    update :update do
-      accept [:rating, :logged_date, :notes, :is_rewatch]
-    end
-
-    destroy :destroy
   end
 
   identities do
     identity :unique_user_tv_show_date, [:user_id, :tv_show_id, :logged_date]
   end
 
-  policies do
-    # Anyone can read logs (public like Letterboxd)
-    policy action_type(:read) do
-      authorize_if always()
-    end
-
-    # Only logged-in users can create logs
-    policy action_type(:create) do
-      authorize_if actor_present()
-    end
-
-    # Only the owner can update/delete their logs
-    policy action_type([:update, :destroy]) do
-      authorize_if actor_attribute_equals(:id, :user_id)
+  defp update_user_rating(_changeset, log, context) do
+    if log.rating do
+      case Stackd.Media.TvShowRating
+      |> Ash.Changeset.for_create(:create, %{
+        tv_show_id: log.tv_show_id,
+        rating: log.rating
+      })
+      |> Ash.create(actor: context.actor) do
+        {:ok, _rating} -> {:ok, log}
+        {:error, error} -> {:error, error}
+      end
+    else
+      {:ok, log}
     end
   end
 end

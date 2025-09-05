@@ -20,8 +20,8 @@ defmodule StackdWeb.Components.Profile.ProfileEditModal do
           </button>
 
           <h2 class="text-xl font-bold mb-6">Edit Profile</h2>
-
-          <!-- Profile Form -->
+          
+    <!-- Profile Form -->
           <.form
             for={@profile_form}
             phx-submit="save_profile"
@@ -73,8 +73,8 @@ defmodule StackdWeb.Components.Profile.ProfileEditModal do
               </button>
             </div>
           </.form>
-
-          <!-- Username Change Form (if allowed) -->
+          
+    <!-- Username Change Form (if allowed) -->
           <div :if={@can_change_username} class="divider">Change Username</div>
 
           <.form

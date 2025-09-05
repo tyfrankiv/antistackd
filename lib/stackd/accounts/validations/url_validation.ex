@@ -56,7 +56,8 @@ defmodule Stackd.Accounts.Validations.UrlValidation do
       {:ok, {10, _, _, _}} -> true
       {:ok, {172, b, _, _}} when b >= 16 and b <= 31 -> true
       {:ok, {192, 168, _, _}} -> true
-      {:ok, {169, 254, _, _}} -> true  # Link-local
+      # Link-local
+      {:ok, {169, 254, _, _}} -> true
       _ -> false
     end
   end
